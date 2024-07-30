@@ -1,0 +1,34 @@
+#libraries
+from os.path import join
+
+if not workflow.overwrite_configfiles:
+    configfile: "config.yml"
+
+ref_dir = config["ref_dir"]
+long_results_dir = config["result_dir"]
+data_dir = config["data_dir"]
+alignment_dir = config["alignment_dir"]
+
+#Long read quantification NoCoverage
+rule bambu_quant:
+    output:
+        quant_dir = directory(join(long_results_dir, 'bambu_quant/{rep}/{sample}')),
+        time_out = join(long_results_dir, "bambu_quant/{rep}/{sample}/time_info"),
+
+    input:
+        alignment = join(alignment_dir, '{rep}/{sample}_G.bam'),
+        gtf_annotation = join(ref_dir, "{rep}", config["gtf_file"]),
+        genome_annotation = join(ref_dir, "{rep}", config["genome_file"]),
+
+    threads: 32
+
+    shell:
+        """
+        mkdir -p {output.quant_dir}
+        chmod u+x quantification/bambu_quant/bambu_quantification.r 
+        /usr/bin/time -o {output.time_out} -v Rscript --vanilla quantification/bambu_quant/bambu_quantification.r --LongRead={input.alignment} --ncore={threads} --annotation={input.gtf_annotation} --genome={input.genome_annotation} --output={output.quant_dir}
+	    """
+
+rule all_bambu:
+    input:
+        mapped_long_reads1 = expand( join(long_results_dir, 'bambu_quant/{rep}/{sample}'), rep=["mouse"], sample = ["PacBio", "ONT"]),

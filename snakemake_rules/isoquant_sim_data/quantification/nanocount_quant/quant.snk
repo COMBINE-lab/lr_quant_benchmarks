@@ -1,0 +1,49 @@
+#libraries
+from os.path import join
+
+if not workflow.overwrite_configfiles:
+    configfile: "config.yml"
+
+long_results_dir = config["result_dir"]
+alignment_dir = config["alignment_dir"]
+nanocount = config["nanocount"]
+
+rule nanocount_quant:
+    output: 
+        out_quant = join(long_results_dir, "NanoCount_quant/{rep}/{sample}/quant.tsv"),
+        out_time = join(long_results_dir, "NanoCount_quant/{rep}/{sample}/time_info"),
+    input:
+        alignment = join(alignment_dir, '{rep}/{sample}_T.bam'),
+
+    params:
+        ax_type = lambda wildcards: " " if wildcards.sample == "drna" else "--keep_neg_strand"
+
+    threads: 1
+
+    shell:
+        """
+        /usr/bin/time -o {output.out_time} -v {nanocount} -i {input.alignment} {params.ax_type} --extra_tx_info -o {output.out_quant} 
+        """
+
+rule nanocount_quant_nofilt:
+    output: 
+        out_quant_nofilt = join(long_results_dir, "NanoCount_quant_nofilt/{rep}/{sample}/quant.tsv"),
+        out_time = join(long_results_dir, "NanoCount_quant/{rep}/{sample}/time_info"),
+    input:
+        alignment = join(alignment_dir, '{rep}/{sample}_T.bam'),
+
+    params:
+        ax_type = lambda wildcards: " " if wildcards.sample == "drna" else "--keep_neg_strand"
+
+    threads: 1
+
+    shell:
+        ## turn off "aggressive filters" in this run
+        """
+        /usr/bin/time -o {output.out_time} -v {nanocount} -i {input.alignment} {params.ax_type} --extra_tx_info -o {output.out_quant_nofilt} -l 1 -f 0.0001 -d -1
+        """
+
+
+rule all_nanocount:
+    input:
+        mapped_long_reads1 = expand( join(long_results_dir, 'NanoCount_quant{rt}/{rep}/{sample}/quant.tsv'), rt=["", "_nofilt"], rep=["mouse"], sample = ["PacBio", "ONT"]),

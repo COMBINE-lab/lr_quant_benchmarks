@@ -1,0 +1,60 @@
+#libraries
+from os.path import join
+
+if not workflow.overwrite_configfiles:
+    configfile: "config.yml"
+
+ref_dir = config["ref_dir"]
+long_results_dir = config["result_dir"]
+data_dir = config["data_dir"]
+alignment_dir = config["alignment_dir"]
+long_results_dir = config["result_dir"]
+
+rule oarfish_quant:
+    output: 
+        quant_nocov = join(long_results_dir, 'oarfish_quant/{rep}/{sample}/out_nocov.quant'),
+        quant_cov = join(long_results_dir, 'oarfish_quant/{rep}/{sample}/out_cov.quant'),
+        time_NoCoverage = join(long_results_dir, 'oarfish_quant/{rep}/{sample}/time_NoCoverage'),
+        time_binomial = join(long_results_dir, 'oarfish_quant/{rep}/{sample}/time_binomial'),
+    input:
+        alignment = join(alignment_dir, '{rep}/{sample}_T.bam'),
+    params:
+        oarfish = config["oarfish"],
+        quant_nocov = join(long_results_dir, 'oarfish_quant/{rep}/{sample}/out_nocov'),
+        quant_cov = join(long_results_dir, 'oarfish_quant/{rep}/{sample}/out_cov'),
+
+    threads: 16
+
+    shell:
+        """
+        mkdir -p {long_results_dir}
+        /usr/bin/time -o {output.time_NoCoverage} -v {params.oarfish} --alignments {input.alignment} --threads {threads} --output {params.quant_nocov} -d . --filter-group no-filters
+        /usr/bin/time -o {output.time_binomial} -v {params.oarfish} --alignments {input.alignment} --threads {threads} --output {params.quant_cov} --model-coverage  -d . --filter-group no-filters
+        """
+
+rule oarfish_quant_prev:
+    output: 
+        quant_nocov = join(long_results_dir, 'oarfish_main_quant/{rep}/{sample}/out_nocov.quant'),
+        quant_cov = join(long_results_dir, 'oarfish_main_quant/{rep}/{sample}/out_cov.quant'),
+        time_NoCoverage = join(long_results_dir, 'oarfish_main_quant/{rep}/{sample}/time_NoCoverage'),
+        time_binomial = join(long_results_dir, 'oarfish_main_quant/{rep}/{sample}/time_binomial'),
+    input:
+        alignment = join(alignment_dir, '{rep}/{sample}_T.bam'),
+    params:
+        oarfish = config["oarfish_prev"],
+        quant_nocov = join(long_results_dir, 'oarfish_main_quant/{rep}/{sample}/out_nocov'),
+        quant_cov = join(long_results_dir, 'oarfish_main_quant/{rep}/{sample}/out_cov'),
+ 
+    threads: 16
+
+    shell:
+        """
+        mkdir -p {long_results_dir}
+        /usr/bin/time -o {output.time_NoCoverage} -v {params.oarfish} --alignments {input.alignment} --threads {threads} --output {params.quant_nocov} --filter-group no-filters
+        /usr/bin/time -o {output.time_binomial} -v {params.oarfish} --alignments {input.alignment} --threads {threads} --output {params.quant_cov} --model-coverage --filter-group no-filters
+        """
+
+rule all_oarfish:
+    input:
+        mapped_long_reads1 = expand( join(long_results_dir, 'oarfish_quant/{rep}/{sample}/{rt}'), rt=["out_nocov.quant", "out_cov.quant"], rep=["mouse"], sample = ["PacBio", "ONT"]),
+        mapped_long_reads2 = expand( join(long_results_dir, 'oarfish_main_quant/{rep}/{sample}/{rt}'), rt=["out_nocov.quant", "out_cov.quant"], rep=["mouse"], sample = ["PacBio", "ONT"]),

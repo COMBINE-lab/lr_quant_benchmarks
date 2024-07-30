@@ -1,0 +1,154 @@
+#libraries
+from os.path import join
+
+if not workflow.overwrite_configfiles:
+    configfile: "config.yml"
+
+kallisto = config["kallisto"]
+bustools = config["bustools"]
+
+long_results_dir = config["result_dir"]
+out_dir = join(long_results_dir, "kallisto")
+data_dir = config["data_dir"]
+path_dir = config["path_dir"]
+ref_dir = config["ref_dir"]
+script_dir = config["script_dir"]
+index_dir = config["index_dir"]
+
+rule kallisto_index:
+    output:
+        index_file = join(index_dir, "kallisto_index_k_63.idx"),
+        #time_kallisto_index = join(long_results_dir, 'time_kallisto_index'),
+    input:
+        transcriptome = join(path_dir, "mouse/reference", config["transcriptome"]),
+
+    threads: 32
+
+    shell:
+        """
+        mkdir -p {index_dir}
+        /usr/bin/time -o {output.time_kallisto_index} -v {kallisto} index -k 63 -i {output.index_file} {input.transcriptome} -t {threads}
+        """
+
+rule kallisto_bus:
+    output:
+        time_kallisto = join(long_results_dir, '{rep}/{sample}/time_kallisto_bus'),
+        bus_file = join(out_dir, "{rep}/{sample}", 'output.bus'),
+        ec_file = join(out_dir, "{rep}/{sample}", 'matrix.ec'),
+        flen_file = join(out_dir, "{rep}/{sample}", 'flens.txt'),
+        txp_file = join(out_dir, "{rep}/{sample}", 'transcripts.txt')
+
+    input:
+        long_read = lambda wildcards: join(data_dir, '{rep}/{sample}', config["data"][wildcards.sample]),
+        index_file = join(index_dir, "kallisto_index_k_63.idx"),
+
+    params:
+        quant_dir = directory(join(out_dir, "{rep}/{sample}")),
+
+    threads: 32
+
+    shell:
+        """
+        mkdir -p {params.quant_dir}
+        /usr/bin/time -o {output.time_kallisto} -v {kallisto} bus -t {threads} -x bulk --long --threshold 0.8 -i {input.index_file} {input.long_read} -o {params.quant_dir}
+        """
+
+rule bustools_sort:
+    output:
+        time_bustools_sort = join(out_dir, '{rep}/{sample}/time_bustools_sort'),
+        sorted_bus_file = join(out_dir, '{rep}/{sample}', 'output.sorted.bus')
+
+    input:
+        bus_file = join(out_dir, '{rep}/{sample}', 'output.bus')
+
+    threads: 32
+
+    shell:
+        """
+        /usr/bin/time -o {output.time_bustools_sort} -v {bustools} sort -t {threads} {input.bus_file} -o {output.sorted_bus_file}
+        """
+
+rule bustools_quant:
+    output:
+        time_quant_bustools = join(out_dir, '{rep}/{sample}/time_bustools_count'),
+        bustool_quant = join(out_dir, '{rep}/{sample}/count.mtx'),
+
+    input:
+        LRGASP_t2g = join(ref_dir, '{rep}/LRGASP.t2g'),
+        sorted_bus_file = join(out_dir, "{rep}/{sample}", "output.sorted.bus"),
+        txps = join(out_dir, '{rep}/{sample}', 'transcripts.txt'),
+        matrix_ec = join(out_dir, '{rep}/{sample}', 'matrix.ec'),
+
+    threads: 32
+
+    params:
+        bustool_quant = join(out_dir, '{rep}/{sample}/count'),
+
+    shell:
+        """
+        /usr/bin/time -o {output.time_quant_bustools} -v {bustools} count {input.sorted_bus_file} -t {input.txps} -e {input.matrix_ec} -o {params.bustool_quant} --cm -m -g {input.LRGASP_t2g}
+        """
+
+rule kallisto_quant:
+    output:
+        time_quant_kallisto = join(out_dir, '{rep}/{sample}/time_kallisto_quant'),
+        mtx = join(out_dir, '{rep}/{sample}', 'matrix.abundance.mtx'),
+        mtx_tpm = join(out_dir, '{rep}/{sample}', 'matrix.abundance.tpm.mtx'),
+
+    input:
+        count_mat = join(out_dir, '{rep}/{sample}', "count.mtx"),
+        flens = join(out_dir, '{rep}/{sample}', "flens.txt"),
+        index_file = join(index_dir, "kallisto_index_k_63.idx"),
+        count_ec = join(out_dir, "{rep}/{sample}", "matrix.ec"),
+
+    params:
+        quant_dir = join(out_dir, "{rep}/{sample}") 
+
+    threads: 32
+
+    shell:
+        """
+        /usr/bin/time -o {output.time_quant_kallisto} -v {kallisto} quant-tcc -t {threads} --long -P {wildcards.sample} {input.count_mat} -f {input.flens} -i {input.index_file} -e {input.count_ec} -o {params.quant_dir}
+        """
+
+rule kallisto_convert:
+    output:
+        time_kallisto_convert = join(out_dir, '{rep}/{sample}/time_kallisto_convert'),
+        abund = join(out_dir, '{rep}/{sample}', 'bus_quant_tcc.tsv'),
+
+    input:
+        inmtx = lambda wildcards: join(out_dir, '{rep}/{sample}', 'matrix.abundance.mtx'),
+
+    threads: 1
+
+    params:
+        abund_script = join(script_dir, "lrk_to_abund.py"),
+        indir = join(out_dir, '{rep}/{sample}'),
+
+    shell:
+        """
+        /usr/bin/time -o {output.time_kallisto_convert} -v python {params.abund_script} {params.indir}
+        """
+
+rule all_kallisto_bus:
+    input:
+        time_out = expand( join(out_dir, '{rep}/{sample}/time_kallisto_bus'), rep=["mouse"], sample=["ONT", "PacBio"]),
+        files_out = expand( join(out_dir, '{rep}/{sample}/{ofile}'), rep=["mouse"], sample=["ONT", "PacBio"], ofile = ['output.bus', 'matrix.ec', 'flens.txt', 'transcripts.txt'])
+
+rule all_bustools_sort:
+    input:
+        time_out = expand( join(out_dir, '{rep}/{sample}', 'time_bustools_sort'), rep=["mouse"], sample=["ONT", "PacBio"]),
+        files_out = expand( join(out_dir, '{rep}/{sample}', '{ofile}'), rep=["mouse"], sample=["ONT", "PacBio"], ofile = ['output.sorted.bus']),
+
+rule all_bustools_count:
+    input:
+        time_out = expand( join(out_dir, '{rep}/{sample}/time_bustools_count'), rep=["mouse"], sample=["ONT", "PacBio"]),
+        files_out = join(out_dir, '{rep}/{sample}', 'count.mtx'),
+
+rule all_kallisto_quant:
+    input:
+        out_files = expand( join(out_dir, '{rep}/{sample}/{ofile}'), ofile=["time_kallisto_quant", "matrix.abundance.mtx", "matrix.abundance.tpm.mtx"], rep=["mouse"], sample=["ONT", "PacBio"]),
+
+rule all_kallisto:
+    input:
+        mapped_long_reads5 = expand( join(out_dir, '{rep}/{sample}/bus_quant_tcc.tsv'), rep=["mouse"], sample=["ONT", "PacBio"]),

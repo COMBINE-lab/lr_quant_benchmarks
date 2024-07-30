@@ -1,0 +1,33 @@
+#libraries
+from os.path import join
+
+if not workflow.overwrite_configfiles:
+    configfile: "config.yml"
+
+ref_dir = config["ref_dir"]
+long_results_dir = config["result_dir"]
+data_dir = config["data_dir"]
+alignment_dir = config["alignment_dir"]
+long_results_dir = config["result_dir"]
+
+include: "alignment/alignment_genome/align.snk"
+include: "alignment/alignment_transcriptome/align.snk"
+include: "quantification/bambu_quant/quant.snk"
+include: "quantification/nanocount_quant/quant.snk"
+include: "quantification/kallisto_quant/quant.snk"
+include: "quantification/oarfish_quant/quant.snk"
+
+rule all:
+    input:
+        kallisto_out = rules.all_kallisto.input,
+        bambu_out = rules.all_bambu.input,
+        nanocount_out = rules.all_nanocount.input,
+        oarfish_out = rules.all_oarfish.input
+
+rule just_nanocount:
+    input:
+        nanocount_out = rules.all_nanocount.input,
+
+rule just_oarfish:
+    input:
+        oarfish_out = rules.all_oarfish.input

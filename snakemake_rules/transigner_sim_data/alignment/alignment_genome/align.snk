@@ -1,0 +1,37 @@
+#libraries
+from os.path import join
+
+if not workflow.overwrite_configfiles:
+    configfile: "config.yml"
+
+alignment_dir = config["alignment_dir"]
+data_dir = config["data_dir"]
+ref_dir = config["ref_dir"]
+minimap2 = config["minimap2"]
+
+#Map long reads against transcripts using minimap2
+rule map_to_genome:
+    output: 
+        bam_out = join(alignment_dir, '{sample}_G.bam'),
+
+    input:
+        genome = join(ref_dir, config["genome_file"]),
+        anno = join(ref_dir, config["junc_bed"]),
+        input_reads = lambda wildcards: join(data_dir, config["data"][wildcards.sample])
+
+    threads: 28
+
+    params:
+        ax_type = lambda wildcards: "splice -uf -k14" if wildcards.sample == "drna" else "splice"
+
+    shell:
+        ## the filter below explicitly removes unmapped and supplementary alignments
+        """
+        {minimap2} --eqx --junc-bed {input.anno} -t {threads} -ax {params.ax_type} {input.genome} {input.input_reads}\
+        | samtools view -@4 -h -F 2052 -bS > {output.bam_out}
+        """
+
+
+rule all_align_genome:
+    input:
+        mapped_long_reads = expand( join(alignment_dir, '{sample}_G.bam'), sample = ["cdna", "drna"]),
