@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13130623.svg)](https://doi.org/10.5281/zenodo.13130623)
+
 # A replicable and modular benchmark for long-read RNA quantification methods
 
 This repository provides a Snakemake-based workflow for evaluating the accuracy of 
