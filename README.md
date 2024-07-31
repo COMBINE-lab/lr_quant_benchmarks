@@ -42,4 +42,5 @@ This benchmark was developed using the following tools and versions:
 | R         | 4.3.3  |
 | oarfish   | 0.4.0 & 0.5.0 |
 | kallisto  | 0.51.0 |
+| bambu     | 3.4.1  |
 | bustools  | 0.43.2 |
