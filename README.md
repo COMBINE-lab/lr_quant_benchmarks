@@ -36,11 +36,11 @@ This benchmark was developed using the following tools and versions:
 
 | Tool | version |
 | -------- | ------- |
-| Python    | 3.12.3 |
-| Snakemake | 8.16.0 |
-| NanoCount | 1.1.0  |
-| R         | 4.3.3  |
-| oarfish   | 0.4.0 & 0.5.0 |
-| kallisto  | 0.51.0 |
 | bambu     | 3.4.1  |
 | bustools  | 0.43.2 |
+| kallisto  | 0.51.0 |
+| NanoCount | 1.1.0  |
+| oarfish   | 0.4.0 & 0.5.0 |
+| Python    | 3.12.3 |
+| R         | 4.3.3  |
+| Snakemake | 8.16.0 |
