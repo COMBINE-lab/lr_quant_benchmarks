@@ -2,8 +2,9 @@
 
 # A replicable and modular benchmark for long-read RNA quantification methods
 
-This repository provides a Snakemake-based workflow for evaluating the accuracy of 
-different methods for transcript-level quantification from long-read RNA-seq data.
+This repository provides a Snakemake-based workflow for evaluating the accuracy
+of different methods for transcript-level quantification from long-read RNA-seq
+data. It accompanies the paper ["A replicable and modular benchmark for long-read transcript quantification methods"](https://www.biorxiv.org/content/10.1101/2024.07.30.605821v1).
 
 At a high-level the organization of the repository is as follows.
 
