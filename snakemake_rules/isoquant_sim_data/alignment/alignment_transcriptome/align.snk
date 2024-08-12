@@ -35,10 +35,10 @@ rule map_long_reads_transcriptome:
         ax_type = lambda wildcards: "map-pb" if wildcards.sample == "PacBio" else "map-ont"
 
     shell:
-        ## the filter below explictly removes unmapped and supplementary alignments
+        ## do not apply any filters to the output bam file
         """
         {minimap2} --eqx -t {threads} -ax {params.ax_type} -N 100 {input.index} {input.long_samples}\
-        | samtools view -@4 -h -F 2052 -bS > {output.bam_out}
+        | samtools view -@4 -h -bS > {output.bam_out}
         """
 
 rule all_align_transcriptome:

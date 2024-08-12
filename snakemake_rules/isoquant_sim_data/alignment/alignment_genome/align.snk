@@ -27,10 +27,10 @@ rule map_long_reads_genome:
         ax_type = lambda wildcards: "splice:hq -uf" if wildcards.sample == "PacBio" else "splice"
 
     shell:
-        ## the filter below explicitly removes unmapped and supplementary alignments
+        ## do not apply any filters to the output bam file
         """
         {minimap2} --eqx --junc-bed {input.anno} -t {threads} -ax {params.ax_type} {input.genome} {input.long_samples}\
-        | samtools view -@4 -h -F 2052 -bS > {output.bam_out}
+        | samtools view -@4 -h -bS > {output.bam_out}
         """
 
 

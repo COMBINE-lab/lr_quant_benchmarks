@@ -25,10 +25,10 @@ rule map_to_genome:
         ax_type = lambda wildcards: "splice -uf -k14" if wildcards.sample == "drna" else "splice"
 
     shell:
-        ## the filter below explicitly removes unmapped and supplementary alignments
+        ## do not apply any filters to the output bam file
         """
         {minimap2} --eqx --junc-bed {input.anno} -t {threads} -ax {params.ax_type} {input.genome} {input.input_reads}\
-        | samtools view -@4 -h -F 2052 -bS > {output.bam_out}
+        | samtools view -@4 -h -bS > {output.bam_out}
         """
 
 

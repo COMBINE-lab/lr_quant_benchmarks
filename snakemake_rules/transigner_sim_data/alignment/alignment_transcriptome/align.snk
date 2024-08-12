@@ -21,10 +21,10 @@ rule map_to_transcriptome:
     threads: 28
 
     shell:
-        ## the filter below explicitly removes unmapped and supplementary alignments
+        ## do not apply any filters to the output bam file
         """
         {minimap2} --eqx -t {threads} -N 100 -ax map-ont {input.transcriptome} {input.input_reads}\
-        | samtools view -@4 -h -F 2052 -bS > {output.bam_out}
+        | samtools view -@4 -h -bS > {output.bam_out}
         """
 
 rule all_align_transcriptome:
