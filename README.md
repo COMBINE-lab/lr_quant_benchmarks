@@ -1,74 +1,102 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13130623.svg)](https://doi.org/10.5281/zenodo.13130623)
 
-# A replicable and modular benchmark for long-read RNA quantification methods
-
+# Oarfish-only results
 Pre-computed results appear below.
 
-### TranSigner-protocol simulations
+### dRNA simulations (using human_NA12878_dRNA_Bham1_guppy_reads.fastq.gz from [https://zenodo.org/records/11201284](https://zenodo.org/records/11201284))
 
-#### cDNA
+#### run on a BAM file *with* filtering using `-F2052`
+
+Alignments were generated with:
+```
+minimap2 -eqx -ax map-ont -t 32 -N 100 input/nanosim_drna/reference/transcripts.fa input/nanosim_drna/dataset/human/drna/human_NA12878_dRNA_Bham1_guppy_reads.fastq.gz | samtools view -@8 -
+h -F2052 -bS > results/nanosim_drna/alignments/aln_T_filtered.bam
+```
+
+oarfish 0.4 (with directional filtering) was run as:
+
+```
+oarfish --three-prime-clip 4294967295 --five-prime-clip 4294967295 \
+  --score-threshold 0.0 --min-aligned-fraction 0.0 --min-aligned-len 1 \
+  --alignments results/nanosim_drna/alignments/aln_T_filtered.bam --threads 32 \
+  --output results/nanosim_drna/filtered_oarfish_prev_quant/quant_cov --model-coverage
+```
+
+to generate the cov result and as
+
+```
+oarfish --three-prime-clip 4294967295 --five-prime-clip 4294967295 \
+  --score-threshold 0.0 --min-aligned-fraction 0.0 --min-aligned-len 1 \
+  --alignments results/nanosim_drna/alignments/aln_T_filtered.bam --threads 32 \
+  --output results/nanosim_drna/filtered_oarfish_prev_quant/quant_no_cov
+```
+
+to generate the no_cov result (with directional filtering). These flags replicate the contents of `--filter-group no-filters` but properly filter out alignments to the negative strand of the RNA.
+
+To generate the results without directional filtering, oarfish 0.4 was run as
+
+```
+oarfish --alignments results/nanosim_drna/alignments/aln_T_filtered.bam --threads 32 --output results/nanosim_drna/filtered_oarfish_prev_quant/quant_cov_nodir --model-coverage --filter-group no-filters
+```
+
+to produce results with the coverage model and no alignment orientation filtering and as 
+
+```
+oarfish --alignments results/nanosim_drna/alignments/aln_T_filtered.bam --threads 32 --output results/nanosim_drna/filtered_oarfish_prev_quant/quant_no_cov_nodir --filter-group no-filters
+```
+
+to produce results without the coverage model and no orientation filtering.
+
+oarfish 0.5 was run as:
+
+```
+oarfish --filter-group no-filters -d fw --alignments results/nanosim_drna/alignments/aln_T_filtered.bam --threads 32 --output results/nanosim_drna/filtered_oarfish_quant/quant_cov --model-coverage
+```
+
+to generate the cov result and as 
+
+```
+oarfish --filter-group no-filters -d fw --alignments results/nanosim_drna/alignments/aln_T_filtered.bam --threads 32 --output results/nanosim_drna/filtered_oarfish_quant/quant_no_cov
+```
+
+to generate the no coverage result.
+
 |                           |   MARD |   Pearson ($\log_{1p}$) |   Kendall-$\tau$ |   Spearman $\rho$ |   CCC |   CCC_non_log |   NRMSE |   NRMSE_std |
 |:--------------------------|-------:|------------------------:|-----------------:|------------------:|------:|--------------:|--------:|------------:|
-| count_oarfish 0.5 (cov)   |  0.065 |                   0.951 |            0.85  |             0.869 | 0.95  |         0.997 |   1.865 |       0.075 |
-| count_oarfish 0.5 (nocov) |  0.087 |                   0.962 |            0.816 |             0.839 | 0.961 |         0.986 |   4.178 |       0.167 |
-| count_oarfish 0.4 (cov)   |  0.136 |                   0.867 |            0.707 |             0.739 | 0.865 |         0.992 |   3.204 |       0.128 |
-| count_oarfish 0.4 (nocov) |  0.092 |                   0.954 |            0.805 |             0.829 | 0.953 |         0.982 |   4.703 |       0.188 |
-| count_nanocount           |  0.327 |                   0.704 |            0.479 |             0.529 | 0.591 |         0.317 |  21.549 |       0.862 |
-| count_nanocount (nofilt)  |  0.435 |                   0.889 |            0.561 |             0.632 | 0.885 |         0.963 |   6.731 |       0.269 |
-| count_bambu               |  0.118 |                   0.903 |            0.755 |             0.786 | 0.903 |         0.948 |   7.87  |       0.315 |
-| count_kallisto            |  0.197 |                   0.871 |            0.612 |             0.649 | 0.864 |         0.819 |  12.246 |       0.49  |
+| count_oarfish 0.5 (cov w/dfilt)   |  0.028 |                   0.969 |            0.86  |             0.868 | 0.969 |         0.998 |   2.744 |       0.069 |
+| count_oarfish 0.5 (nocov w/dfilt) |  0.03  |                   0.956 |            0.851 |             0.859 | 0.956 |         0.994 |   4.459 |       0.113 |
+| count_oarfish 0.5 (cov no/dfilt)   |  0.026 |                   0.969 |            0.856 |             0.864 | 0.969 |         0.998 |   2.78  |       0.068 |
+| count_oarfish 0.5 (nocov no/dfilt) |  0.029 |                   0.956 |            0.847 |             0.855 | 0.956 |         0.994 |   4.594 |       0.112 |
+| count_oarfish 0.4 (cov w/dfilt)   |  0.068 |                   0.888 |            0.715 |             0.73  | 0.885 |         0.984 |   7.046 |       0.178 |
+| count_oarfish 0.4 (nocov w/dfilt) |  0.031 |                   0.952 |            0.849 |             0.858 | 0.952 |         0.992 |   4.815 |       0.122 |
+| count_oarfish 0.4 (cov no/dfilt)   |  0.065 |                   0.887 |            0.709 |             0.724 | 0.884 |         0.984 |   7.124 |       0.174 |
+| count_oarfish 0.4 (nocov no/dfilt) |  0.029 |                   0.952 |            0.846 |             0.854 | 0.952 |         0.993 |   4.969 |       0.121 |
 
-#### dRNA 
+#### run on a BAM file *without* filtering
 
-|                           |   MARD |   Pearson ($\log_{1p}$) |   Kendall-$\tau$ |   Spearman $\rho$ |   CCC |   CCC_non_log |   NRMSE |   NRMSE_std |
-|:--------------------------|-------:|------------------------:|-----------------:|------------------:|------:|--------------:|--------:|------------:|
-| count_oarfish 0.5 (cov)   |  0.042 |                   0.974 |            0.894 |             0.907 | 0.974 |         0.998 |   1.335 |       0.06  |
-| count_oarfish 0.5 (nocov) |  0.06  |                   0.978 |            0.855 |             0.871 | 0.978 |         0.991 |   3.034 |       0.135 |
-| count_oarfish 0.4 (cov)   |  0.101 |                   0.903 |            0.744 |             0.767 | 0.901 |         0.992 |   2.732 |       0.122 |
-| count_oarfish 0.4 (nocov) |  0.067 |                   0.973 |            0.839 |             0.857 | 0.973 |         0.989 |   3.337 |       0.149 |
-| count_nanocount           |  0.35  |                   0.726 |            0.47  |             0.521 | 0.671 |         0.549 |  16.776 |       0.748 |
-| count_nanocount (nofilt)  |  0.443 |                   0.842 |            0.52  |             0.587 | 0.833 |         0.955 |   6.572 |       0.293 |
-| count_bambu               |  0.094 |                   0.913 |            0.777 |             0.802 | 0.912 |         0.941 |   7.531 |       0.336 |
-| count_kallisto            |  0.176 |                   0.873 |            0.614 |             0.646 | 0.869 |         0.769 |  12.152 |       0.542 |
+Alignments were generated with:
+```
+minimap2 -eqx -ax map-ont -t 32 -N 100 input/nanosim_drna/reference/transcripts.fa input/nanosim_drna/dataset/human/drna/human_NA12878_dRNA_Bham1_guppy_reads.fastq.gz | samtools view -@8 -
+h -bS > results/nanosim_drna/alignments/aln_T.bam
+```
 
-### IsoQuant-protocol simulations
-
-#### ONT
+all versions of oarfish were run exactly as above, but with the input being `aln_T.bam` rather than `aln_T_filtered.bam`.
 
 |                           |   MARD |   Pearson ($\log_{1p}$) |   Kendall-$\tau$ |   Spearman $\rho$ |   CCC |   CCC_non_log |   NRMSE |   NRMSE_std |
 |:--------------------------|-------:|------------------------:|-----------------:|------------------:|------:|--------------:|--------:|------------:|
-| count_oarfish 0.5 (cov)   |  0.062 |                   0.96  |            0.926 |             0.953 | 0.96  |         0.971 |   2.146 |       0.243 |
-| count_oarfish 0.5 (nocov) |  0.061 |                   0.962 |            0.932 |             0.959 | 0.961 |         0.973 |   2.109 |       0.239 |
-| count_oarfish 0.4 (cov)   |  0.086 |                   0.96  |            0.884 |             0.912 | 0.96  |         0.968 |   2.26  |       0.256 |
-| count_oarfish 0.4 (nocov) |  0.061 |                   0.959 |            0.928 |             0.955 | 0.958 |         0.973 |   2.12  |       0.24  |
-| count_nanocount           |  0.27  |                   0.902 |            0.731 |             0.789 | 0.897 |         0.773 |   4.798 |       0.543 |
-| count_nanocount (nofilt)  |  0.298 |                   0.943 |            0.727 |             0.798 | 0.943 |         0.929 |   3.306 |       0.374 |
-| count_bambu               |  0.09  |                   0.936 |            0.883 |             0.919 | 0.936 |         0.89  |   3.971 |       0.449 |
-| count_kallisto            |  0.094 |                   0.953 |            0.885 |             0.92  | 0.953 |         0.972 |   2.09  |       0.236 |
-
-
-#### PacBio
-
-|                           |   MARD |   Pearson ($\log_{1p}$) |   Kendall-$\tau$ |   Spearman $\rho$ |   CCC |   CCC_non_log |   NRMSE |   NRMSE_std |
-|:--------------------------|-------:|------------------------:|-----------------:|------------------:|------:|--------------:|--------:|------------:|
-| count_oarfish 0.5 (cov)   |  0.013 |                   0.986 |            0.975 |             0.98  | 0.986 |         0.994 |   0.984 |       0.107 |
-| count_oarfish 0.5 (nocov) |  0.015 |                   0.984 |            0.971 |             0.977 | 0.984 |         0.993 |   1.13  |       0.123 |
-| count_oarfish 0.4 (cov)   |  0.015 |                   0.986 |            0.973 |             0.979 | 0.985 |         0.994 |   0.978 |       0.106 |
-| count_oarfish 0.4 (nocov) |  0.018 |                   0.98  |            0.966 |             0.973 | 0.98  |         0.99  |   1.314 |       0.143 |
-| count_nanocount           |  0.054 |                   0.957 |            0.936 |             0.963 | 0.957 |         0.933 |   3.307 |       0.36  |
-| count_nanocount (nofilt)  |  0.075 |                   0.934 |            0.921 |             0.957 | 0.934 |         0.925 |   3.507 |       0.382 |
-| count_bambu               |  0.02  |                   0.983 |            0.969 |             0.977 | 0.983 |         0.927 |   3.286 |       0.357 |
-| count_kallisto            |  0.031 |                   0.99  |            0.965 |             0.977 | 0.989 |         0.935 |   3.169 |       0.345 |
-
+| count_oarfish 0.5 (cov w/dfilt)   |  0.028 |                   0.969 |            0.86  |             0.868 | 0.969 |         0.998 |   2.744 |       0.069 |
+| count_oarfish 0.5 (nocov w/dfilt) |  0.03  |                   0.956 |            0.851 |             0.859 | 0.956 |         0.994 |   4.459 |       0.113 |
+| count_oarfish 0.5 (cov no/dfilt)   |  0.026 |                   0.969 |            0.856 |             0.864 | 0.969 |         0.998 |   2.78  |       0.068 |
+| count_oarfish 0.5 (nocov no/dfilt) |  0.029 |                   0.956 |            0.847 |             0.855 | 0.956 |         0.994 |   4.594 |       0.112 |
+| count_oarfish 0.4 (cov w/dfilt)   |  0.068 |                   0.888 |            0.715 |             0.73  | 0.885 |         0.984 |   7.046 |       0.178 |
+| count_oarfish 0.4 (nocov w/dfilt) |  0.031 |                   0.952 |            0.849 |             0.858 | 0.952 |         0.992 |   4.815 |       0.122 |
+| count_oarfish 0.4 (cov no/dfilt)   |  0.065 |                   0.887 |            0.709 |             0.724 | 0.884 |         0.984 |   7.124 |       0.174 |
+| count_oarfish 0.4 (nocov no/dfilt) |  0.029 |                   0.952 |            0.846 |             0.854 | 0.952 |         0.993 |   4.969 |       0.121 |
 
 This benchmark was developed using the following tools and versions:
 
 | Tool | version |
 | -------- | ------- |
-| bambu     | 3.4.1  |
-| bustools  | 0.43.2 |
-| kallisto  | 0.51.0 |
-| NanoCount | 1.1.0  |
 | oarfish   | 0.4.0 & 0.5.0 |
 | Python    | 3.12.3 |
 | R         | 4.3.3  |
