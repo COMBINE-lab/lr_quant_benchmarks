@@ -18,7 +18,7 @@ index_dir = config["index_dir"]
 rule kallisto_index:
     output:
         index_file = join(index_dir, "kallisto_index_k_63.idx"),
-        #time_kallisto_index = join(long_results_dir, 'time_kallisto_index'),
+        time_kallisto_index = join(long_results_dir, 'time_kallisto_index'),
     input:
         transcriptome = join(path_dir, "mouse/reference", config["transcriptome"]),
 
