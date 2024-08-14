@@ -67,12 +67,13 @@ def get_mard_table(m, true_key, pred_counts):
         res[n] = r.mean()
     return pd.DataFrame.from_dict(res, orient="index", columns=["MARD"])
 
+
 def get_nrmse_table(m, true_key, pred_counts, norm="mean"):
     f = None
     if norm == "mean":
-        f = lambda z : np.mean(z)
+        def f(z): return np.mean(z)
     elif norm == "std":
-        f = lambda z : np.std(z)
+        def f(z): return np.std(z)
     else:
         print(f"don't know norm method {norm}")
         exit(1)
@@ -89,14 +90,12 @@ def get_nrmse_table(m, true_key, pred_counts, norm="mean"):
 def get_ccc_table(m, true_key, pred_counts, use_log=True):
     f = None
     if use_log:
-        f = lambda z: np.log1p(z)
+        def f(z): return np.log1p(z)
     else:
-        f = lambda z: z
+        def f(z): return z
 
     ccc_correlation = {}
-    pearson_table = (
-        f(m.drop(["tid"], axis=1)).corr(method="pearson").loc[:, true_key]
-    )
+    pearson_table = f(m.drop(["tid"], axis=1)).corr(method="pearson").loc[:, true_key]
     y_true = f(m.loc[:, true_key])
     for column_name in pred_counts:
         y_pred = f(m.loc[:, column_name])
@@ -149,18 +148,29 @@ def main(args):
 
     if "bambu" in meth_d:
         b = None
-        for other in ["nanocount", "nanocount_nocov", "oarfish", "oarfish_nocov", "oarfish_prev", "oarfish_prev_nocov", "kallisto"]:
+        for other in [
+            "nanocount",
+            "nanocount (nofilt)",
+            "oarfish 0.5 (cov)",
+            "oarfish 0.5 (nocov)",
+            "oarfish 0.4 (cov)",
+            "oarfish 0.4 (nocov)",
+            "kallisto",
+            "transigner",
+        ]:
             if other in meth_d:
                 b = meth_d[other]
                 break
         if b is None:
-            print("Must evaluate at least one other method along with bambu to elimiate extra annotations from the base set")
-        x = meth_d["bambu"]
-        b = meth_d["nanocount"]
-        meth_d["bambu"] = x.loc[ x["tid"].isin(b["tid"]), : ]
+            print(
+                "Must evaluate at least one other method along with bambu to elimiate extra annotations from the base set"
+            )
+        else:
+            x = meth_d["bambu"]
+            meth_d["bambu"] = x.loc[x["tid"].isin(b["tid"]), :]
 
-    true_nnz = t.loc[t.count_true > 0, :].shape[0]
-    #print(f"There are {true_nnz} true transcripts with abundance > 0")
+    # true_nnz = t.loc[t.count_true > 0, :].shape[0]
+    # print(f"There are {true_nnz} true transcripts with abundance > 0")
 
     plt.rc("font", size=8)
     plt.rc("axes", labelsize=8)
@@ -204,37 +214,37 @@ def main(args):
         ms[join_strategy] = m
 
     for join_strategy, m in ms.items():
-        #print(f"\n\njoin strategy = {join_strategy}")
-        #print(f"\nThere were {m.shape[0]} transcripts in the unfiltered annotation\n")
+        # print(f"\n\njoin strategy = {join_strategy}")
+        # print(f"\nThere were {m.shape[0]} transcripts in the unfiltered annotation\n")
         pred_array = [f"count_{k}" for k in meth_d.keys()]
         key_array = ["count_true"] + pred_array
         print("computing Spearman correlations")
         spearman_table = m[key_array].corr(method="spearman").loc[:, "count_true"]
-        #print(spearman_table.round(decimals=3).to_latex())
+        # print(spearman_table.round(decimals=3).to_latex())
 
         print("computing Kendall-Tau correlations")
         kendall_table = m[key_array].corr(method="kendall").loc[:, "count_true"]
-        #print(kendall_table.round(decimals=3).to_latex())
+        # print(kendall_table.round(decimals=3).to_latex())
 
         print("computing Pearson correlations (of log1p)")
         pearson_table = (
             np.log1p(m[key_array]).corr(method="pearson").loc[:, "count_true"]
         )
-        #print(pearson_table.round(decimals=3).to_latex())
-        #print("\n")
+        # print(pearson_table.round(decimals=3).to_latex())
+        # print("\n")
 
         print("computing MARDs")
         mard_table = get_mard_table(m, "count_true", pred_array)
-        #print(mard_table.round(decimals=3).to_latex())
-        #print("\n")
+        # print(mard_table.round(decimals=3).to_latex())
+        # print("\n")
 
         print("computing CCC")
         ccc_table = get_ccc_table(m, "count_true", pred_array)
-        #print(ccc_table.round(decimals=3).to_latex())
-        #print("\n")
+        # print(ccc_table.round(decimals=3).to_latex())
+        # print("\n")
 
         ccc_table_non_log = get_ccc_table(m, "count_true", pred_array, use_log=False)
- 
+
         nrmse_table = get_nrmse_table(m, "count_true", pred_array)
         nrmse_table_std = get_nrmse_table(m, "count_true", pred_array, norm="std")
         res_table = pd.concat(
@@ -263,8 +273,8 @@ def main(args):
             ],
             axis=1,
         ).drop(["count_true"], axis=0)
-        #print(res_table.round(decimals=3).to_latex(float_format="{:0.3f}".format))
-        
+        # print(res_table.round(decimals=3).to_latex(float_format="{:0.3f}".format))
+
         print(res_table.round(decimals=3).to_markdown())
 
         print("\n")

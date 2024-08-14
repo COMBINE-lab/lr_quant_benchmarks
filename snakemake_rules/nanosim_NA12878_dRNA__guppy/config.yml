@@ -1,0 +1,43 @@
+
+# tools 
+# path to oarfish (>= 0.4)
+oarfish_prev: "/mnt/scratch1/lr_quant_benchmarks_public/software/oarfish_0.4/target/release/oarfish"
+# path to oarfish (>= v0.5)
+oarfish: "/mnt/scratch1/lr_quant_benchmarks_public/software/oarfish_0.5/target/release/oarfish"
+# path to kallisto (>= v0.51.0)
+kallisto: "/mnt/scratch1/lr_quant_benchmarks_public/software/kallisto-0.51.0/build/src/kallisto"
+# path to kallisto (>= v0.43.2)
+bustools: "/mnt/scratch1/lr_quant_benchmarks_public/software/bustools/build/src/bustools"
+# path to NanoCount (>= v1.1.0)
+nanocount: "NanoCount"
+# path to minimap2 (>= 2.28-r1209)
+minimap2: "minimap2"
+# path to samtools (>= v1.10)
+samtools: "samtools"
+
+# where scripts live
+script_dir: "/mnt/scratch1/lr_quant_benchmarks_public/scripts/"
+
+# top level for input files
+path_dir: "/mnt/scratch1/lr_quant_benchmarks_public/input/nanosim_NA12878_dRNA__guppy/"
+# where reads live
+data_dir: "/mnt/scratch1/lr_quant_benchmarks_public/input/nanosim_NA12878_dRNA__guppy/dataset/"
+# where references live
+ref_dir: "/mnt/scratch1/lr_quant_benchmarks_public/input/nanosim_NA12878_dRNA__guppy/reference/"
+
+# top-level results dir
+result_dir: "/mnt/scratch1/lr_quant_benchmarks_public/results/nanosim_NA12878_dRNA__guppy/"
+# where alignments go
+alignment_dir: "/mnt/scratch1/lr_quant_benchmarks_public/results/nanosim_NA12878_dRNA__guppy/alignment/"
+# where indices will be written
+index_dir: "/mnt/scratch1/lr_quant_benchmarks_public/input/nanosim_NA12878_dRNA__guppy/indexes/"
+
+# names for specific data files
+transcriptome: "transcripts.fa"
+gtf_file: "lrgasp_gencode_v38_sirvs.gtf"
+junc_bed: "lrgasp_gencode_v38_sirvs_junc.bed"
+genome_file: "lrgasp_grch38_sirvs.fasta"
+t2g: "lrgasp_gencode_v38_sirvs.t2g"
+
+data:
+    drna: "human/drna/human_NA12878_dRNA_Bham1_guppy_reads.fastq.gz"
