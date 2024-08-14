@@ -1,0 +1,62 @@
+#libraries
+from os.path import join
+
+if not workflow.overwrite_configfiles:
+    configfile: "config.yml"
+
+ref_dir = config["ref_dir"]
+long_results_dir = config["result_dir"]
+data_dir = config["data_dir"]
+alignment_dir = config["alignment_dir"]
+long_results_dir = config["result_dir"]
+
+rule oarfish_quant:
+    output: 
+        quant_nocov = join(long_results_dir, 'oarfish_quant/{sample}/out_nocov.quant'),
+        quant_cov = join(long_results_dir, 'oarfish_quant/{sample}/out_cov.quant'),
+        time_NoCoverage = join(long_results_dir, 'oarfish_quant/{sample}/time_nocov'),
+        time_binomial = join(long_results_dir, 'oarfish_quant/{sample}/time_cov'),
+    input:
+        alignment = join(alignment_dir, '{sample}_T.bam'),
+    params:
+        oarfish = config["oarfish"],
+        quant_nocov = join(long_results_dir, 'oarfish_quant/{sample}/out_nocov'),
+        quant_cov = join(long_results_dir, 'oarfish_quant/{sample}/out_cov'),
+        ori_filt = lambda wildcards: "+" if wildcards.sample == "drna" else "."
+
+    threads: 16
+
+    shell:
+        """
+        mkdir -p {long_results_dir}
+        /usr/bin/time -o {output.time_NoCoverage} -v {params.oarfish} --alignments {input.alignment} --threads {threads} --output {params.quant_nocov} -d {params.ori_filt} --filter-group no-filters
+        /usr/bin/time -o {output.time_binomial} -v {params.oarfish} --alignments {input.alignment} --threads {threads} --output {params.quant_cov} --model-coverage  -d {params.ori_filt} --filter-group no-filters
+        """
+
+rule oarfish_quant_prev:
+    output: 
+        quant_nocov = join(long_results_dir, 'oarfish_main_quant/{sample}/out_nocov.quant'),
+        quant_cov = join(long_results_dir, 'oarfish_main_quant/{sample}/out_cov.quant'),
+        time_NoCoverage = join(long_results_dir, 'oarfish_main_quant/{sample}/time_nocov'),
+        time_binomial = join(long_results_dir, 'oarfish_main_quant/{sample}/time_cov'),
+    input:
+        alignment = join(alignment_dir, '{sample}_T.bam'),
+    params:
+        oarfish = config["oarfish_prev"],
+        quant_nocov = join(long_results_dir, 'oarfish_main_quant/{sample}/out_nocov'),
+        quant_cov = join(long_results_dir, 'oarfish_main_quant/{sample}/out_cov'),
+        ori_filt = lambda wildcards: "--three-prime-clip 4294967295 --five-prime-clip 4294967295 --score-threshold 0.0 --min-aligned-fraction 0.0 --min-aligned-len 1" if wildcards.sample == "drna" else "--three-prime-clip 4294967295 --five-prime-clip 4294967295 --score-threshold 0.0 --min-aligned-fraction 0.0 --min-aligned-len 1 --allow-negative-strand"
+
+    threads: 16
+
+    shell:
+        """
+        mkdir -p {long_results_dir}
+        /usr/bin/time -o {output.time_NoCoverage} -v {params.oarfish} --alignments {input.alignment} --threads {threads} --output {params.quant_nocov} {params.ori_filt}
+        /usr/bin/time -o {output.time_binomial} -v {params.oarfish} --alignments {input.alignment} --threads {threads} --output {params.quant_cov} --model-coverage {params.ori_filt}
+        """
+
+rule all_oarfish:
+    input:
+        mapped_long_reads1 = expand( join(long_results_dir, 'oarfish_quant/{sample}/{rt}'), rt=["out_nocov.quant", "out_cov.quant"], sample = ["drna"]),
+        mapped_long_reads2 = expand( join(long_results_dir, 'oarfish_main_quant/{sample}/{rt}'), rt=["out_nocov.quant", "out_cov.quant"], sample = ["drna"]),

@@ -1,0 +1,31 @@
+#libraries
+from os.path import join
+
+if not workflow.overwrite_configfiles:
+    configfile: "config.yml"
+
+alignment_dir = config["alignment_dir"]
+data_dir = config["data_dir"]
+ref_dir = config["ref_dir"]
+minimap2 = config["minimap2"]
+
+#Map long reads against transcripts using minimap2
+rule map_to_transcriptome:
+    output: 
+        bam_out = join(alignment_dir, '{sample}_T.bam'),
+    input:
+        transcriptome = join(ref_dir, config["transcriptome"]),
+        input_reads = lambda wildcards: join(data_dir, config["data"][wildcards.sample]),
+
+    threads: 28
+
+    shell:
+        ## do not apply any filters to the output bam file
+        """
+        {minimap2} --eqx -t {threads} -N 100 -ax map-ont {input.transcriptome} {input.input_reads}\
+        | samtools view -@4 -b > {output.bam_out}
+        """
+
+rule all_align_transcriptome:
+    input:
+        mapped_long_reads = expand( join(alignment_dir, '{sample}_T.bam'), sample = ["drna"])
