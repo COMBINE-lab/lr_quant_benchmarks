@@ -33,6 +33,40 @@ Likewise, make note that the full output for all simulations will take aroun 93G
 be placed in a directory named `results` at the top level of this repository, but the output directory 
 is configurable via the `config.yml` files.
 
+The `snakemake_rules` directory has a subdirectory for each of the different simulations.  The main simulations
+corresponding to the paper are `isoquant_sim_data` and `transigner_sim_data`. Each directory contains a
+`config.yml` file that you will need to fill in with the appropriate directories and tool paths, and a `main.snk`
+file that has an `all` rule to run all of the quantification tools.
+
+## Additional data
+
+The directory `snakemake_rules/nanosim_NA12878_dRNA__guppy` contains the rules
+for processing a simulated dataset of ONT directRNA data as the
+`isoquant_sim_data` and `transigner_sim_data` directories above have for their
+respective data, as well as a `config.yml` that will also need to be
+appropriately filled in. The simulated data is originally obtained from
+[https://zenodo.org/records/11201284](https://zenodo.org/records/11201284),
+uploaded by Loving et al. You can obtain the simulated reads as well as all of
+the other necessary input files like the reference transcriptome and ground
+truth counts can be obtained from [this link](https://umd.box.com/shared/static/0kibdjw9yohkbw3xi92fgcr112xsuseg.zstd).
+
+Specfically, you can obtain the data with the command:
+
+```{sh}
+$ wget  -O nanosim_NA12878_dRNA__guppy.tar.zstd https://umd.box.com/shared/static/0kibdjw9yohkbw3xi92fgcr112xsuseg.zstd
+```
+
+you can then decompress it in the top-level input directory as follows
+
+```{sh}
+$ mkdir -p input
+$ tar --use-compress-program=zstd nanosim_NA12878_dRNA__guppy.tar.zstd -C input
+```
+
+_Note_: Currently this additional dataset only runs the `oarfish` and `NanoCount` quantifiers.
+
+### Program versions and information
+
 This benchmark was developed using the following tools and versions:
 
 | Tool | version |
