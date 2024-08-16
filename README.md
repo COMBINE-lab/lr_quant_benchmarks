@@ -79,3 +79,13 @@ This benchmark was developed using the following tools and versions:
 | Python    | 3.12.3 |
 | R         | 4.3.3  |
 | Snakemake | 8.16.0 |
+
+
+#### Conda installation
+
+You can install the latest versions of the requirements via e.g.
+
+```sh
+micromamba create -f environment.yml
+micromamba activate lr_quant_benchmark
+```
