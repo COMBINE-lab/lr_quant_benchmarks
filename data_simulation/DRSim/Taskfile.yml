@@ -1,0 +1,199 @@
+version: '3'
+
+tasks:
+
+  get_read_data:
+    summary: |
+      Obtain the NA12878 directRNA read data
+    cmds:
+      - aria2c -x8 https://s3.amazonaws.com/nanopore-human-wgs/rna/fastq/NA12878-DirectRNA_All_Guppy_4.2.2.fastq.gz
+
+  get_ref_txps:
+    summary: |
+      Obtain the reference transcript sequences for RefSeq 110 (GRCh38)
+    cmds:
+      - aria2c -x8 https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/110/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_rna.fna.gz
+      - awk '{if($0 ~ /^>/) print $1; else print $0}' GCF_000001405.40_GRCh38.p14_rna.fna > cleaned.fa
+
+  get_ref_genome:
+    summary: |
+      Obtain the reference genome sequences for RefSeq 110 (GRCh38)
+    cmds:
+      - aria2c -x8 https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/110/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz
+
+  get_ref_annotation:
+    summary: |
+      obtain the resfrence annotation for RefSeq 110
+    cmds:
+      - aria2c -x8 https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/110/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.gff.gz
+
+
+  quant_drna_txps:
+    cmds:
+      - echo "Running minimap2 on drna dataset"
+      - minimap2 -ax map-ont --eqx -N 181 -t 128 GCF_000001405.40_GRCh38.p14_rna.fna NA12878-DirectRNA_All_Guppy_4.2.2.fastq.gz | samtools view -o NA12878-DirectRNA.bam -@ 128
+      - echo "Running salmon on drna for quantification"
+      - mkdir -p NA12878-DirectRNA_quantification
+      - salmon/build/src/salmon quant --ont --useEM -p 128 -t GCF_000001405.40_GRCh38.p14_rna.fna -l U -a NA12878-DirectRNA.bam -o NA12878-DirectRNA_quantification
+
+
+  get_ref_quants:
+    summary: |
+      Obtain the reference quantifications compatible with SimReadTruncs
+    cmds:
+      - awk 'BEGIN {print "transcript_id\tread_count"} NR>1 {print $1 "\t" $5}' NA12878-DirectRNA_quantification/quant.sf > dRNA_quantification.tsv
+    generates:
+      - dRNA_quantification.tsv
+
+
+  generate_pc_lnc_ref:
+    summary: |
+      Filter for just the protein coding and long non-coding RNA transcripts
+    cmds:
+      - rg "(^>NM_)|(long non-coding RNA)" GCF_000001405.40_GRCh38.p14_rna.fna | cut -d' ' -f1 | awk '{print(substr($1,2))}' > target_transcript_names_tmp.txt
+      - defer: rm target_transcript_names_tmp.txt
+      - rg -F -f target_transcript_names_tmp.txt dRNA_quantification.tsv | cut -f 1 | rg -v "\.\d+_\d+" > target_transcript_names.txt
+      - python3 get_target_seqs.py target_transcript_names.txt GCF_000001405.40_GRCh38.p14_rna.fna > GCF_000001405.40_GRCh38.p14_pc_lncrna.fna
+
+  filter_quantification_file:
+    summary: |
+      Filter for just the protein coding and long non-coding RNA transcripts
+    cmds:
+      - head -n 1 dRNA_quantification.tsv > dRNA_quantification_pc_lncrna.tsv
+      - grep -F -f target_transcript_names.txt dRNA_quantification.tsv >> dRNA_quantification_pc_lncrna.tsv
+    generates:
+      - dRNA_quantification_pc_lncrna.tsv
+
+
+  #==================================================================================================================================================================================
+  #================================================================apply the DRSim function =========================================================================================
+  #==================================================================================================================================================================================
+  
+  sim_truncs:
+    summary: |
+      Running the truncated simulated reads using SimReadTruncs
+    cmds:
+      - Rscript ~/SimReadTruncs/SimReadTruncs.R -f GCF_000001405.40_GRCh38.p14_pc_lncrna.fna -c dRNA_quantification_pc_lncrna.tsv -l human -o truncated_reads.fasta
+
+  
+  #==================================================================================================================================================================================
+  #================================================================Using Badread to add errors to the simulaed dataset===============================================================
+  #==================================================================================================================================================================================
+  
+  badread_aligned_paf_file:
+    summary: |
+     Obtain paf file for badread model
+    cmds:
+      - minimap2 -t 32 -c -x map-ont GCF_000001405.40_GRCh38.p14_pc_lncrna.fna NA12878-DirectRNA_All_Guppy_4.2.2.fastq.gz | gzip > NA12878-directRNA.paf.gz
+
+  badread_qscore_model:
+    summary: |
+     Obtain the badread qscore model 
+    cmds:
+      - badread qscore_model --reference GCF_000001405.40_GRCh38.p14_pc_lncrna.fna --reads NA12878-DirectRNA_All_Guppy_4.2.2.fastq.gz --alignment NA12878-directRNA.paf.gz > NA12878_directRNA_qscore_model
+  
+  badread_error_model:
+    summary: |
+     Obtain the badread error model 
+    cmds:
+      - badread error_model --reference GCF_000001405.40_GRCh38.p14_pc_lncrna.fna --reads NA12878-DirectRNA_All_Guppy_4.2.2.fastq.gz --alignment NA12878-directRNA.paf.gz > NA12878_directRNA_error_model
+
+  badread_length:
+    summary: |
+     Obtain the badread identity 
+    cmds:
+      - zcat NA12878-DirectRNA_All_Guppy_4.2.2.fastq.gz | awk 'NR % 4 == 2 { print length($0) }' > read_length.csv
+      - python mean_std.py read_length.csv
+
+  badread_identity:
+    summary: |
+     Obtain the badread identity 
+    cmds:
+      - python badread_identity.py NA12878-directRNA.paf.gz
+
+  badread_sim_reads:
+    summary: |
+     Obtain the badread qscore model 
+    cmds:
+      - badread simulate --reference truncated_reads.fasta --quantity 15000M --start_adapter_seq "" --end_adapter_seq "" --error_model NA12878_directRNA_error_model --qscore_model NA12878_directRNA_qscore_model --identity 90.32,100.00,3.17 --junk 0 --random 0 --length 10000,10000 | gzip > truncated_w_errors_reads.fastq.gz
+
+
+
+  # Simulate the reads using Badread simultaneously on 5 different nodes and then add sim1, sim2, ... to the read names
+  badread_sim_reads_node1:
+    summary: |
+     Simulate reads
+    cmds:
+      - badread simulate --reference truncated_reads.fasta --quantity 3000M --start_adapter_seq "" --end_adapter_seq "" --error_model NA12878_directRNA_error_model --qscore_model NA12878_directRNA_qscore_model --identity 90.32,100.00,3.17 --junk 0 --random 0 --length 10000,10000 | gzip > truncated_w_errors_reads_node1.fastq.gz
+      - zcat truncated_w_errors_reads_node1.fastq.gz | awk 'NR % 4 == 1 {$0 = "@" prefix substr($0, 2)} {print}' prefix="sim1-" | gzip > truncated_w_errors_reads_node1_sim1.fastq.gz
+
+  badread_sim_reads_node2:
+    summary: |
+     Simulate reads
+    cmds:
+      - badread simulate --reference truncated_reads.fasta --quantity 3000M --start_adapter_seq "" --end_adapter_seq "" --error_model NA12878_directRNA_error_model --qscore_model NA12878_directRNA_qscore_model --identity 90.32,100.00,3.17 --junk 0 --random 0 --length 10000,10000 | gzip > truncated_w_errors_reads_node2.fastq.gz
+      - zcat truncated_w_errors_reads_node2.fastq.gz | awk 'NR % 4 == 1 {$0 = "@" prefix substr($0, 2)} {print}' prefix="sim2-" | gzip > truncated_w_errors_reads_node2_sim2.fastq.gz
+
+  badread_sim_reads_node3:
+    summary: |
+     Simulate reads
+    cmds:
+      - badread simulate --reference truncated_reads.fasta --quantity 3000M --start_adapter_seq "" --end_adapter_seq "" --error_model NA12878_directRNA_error_model --qscore_model NA12878_directRNA_qscore_model --identity 90.32,100.00,3.17 --junk 0 --random 0 --length 10000,10000 | gzip > truncated_w_errors_reads_node3.fastq.gz
+      - zcat truncated_w_errors_reads_node3.fastq.gz | awk 'NR % 4 == 1 {$0 = "@" prefix substr($0, 2)} {print}' prefix="sim3-" | gzip > truncated_w_errors_reads_node3_sim3.fastq.gz
+
+  badread_sim_reads_node4:
+    summary: |
+     Simulate reads
+    cmds:
+      - badread simulate --reference truncated_reads.fasta --quantity 3000M --start_adapter_seq "" --end_adapter_seq "" --error_model NA12878_directRNA_error_model --qscore_model NA12878_directRNA_qscore_model --identity 90.32,100.00,3.17 --junk 0 --random 0 --length 10000,10000 | gzip > truncated_w_errors_reads_node4.fastq.gz
+      - zcat truncated_w_errors_reads_node4.fastq.gz | awk 'NR % 4 == 1 {$0 = "@" prefix substr($0, 2)} {print}' prefix="sim4-" | gzip > truncated_w_errors_reads_node4_sim4.fastq.gz
+
+  badread_sim_reads_node5:
+    summary: |
+     Simulate reads 
+    cmds:
+      - badread simulate --reference truncated_reads.fasta --quantity 3000M --start_adapter_seq "" --end_adapter_seq "" --error_model NA12878_directRNA_error_model --qscore_model NA12878_directRNA_qscore_model --identity 90.32,100.00,3.17 --junk 0 --random 0 --length 10000,10000 | gzip > truncated_w_errors_reads_node5.fastq.gz
+      - zcat truncated_w_errors_reads_node5.fastq.gz | awk 'NR % 4 == 1 {$0 = "@" prefix substr($0, 2)} {print}' prefix="sim5-" | gzip > truncated_w_errors_reads_node5_sim5.fastq.gz
+
+
+# Concatenate the 5 different files together and randomly select 14 million reads from the final output
+  sim_reads_concat_14M:
+    summary: |
+     concatenating 5 different .fastq.gz files and randomly choose 14M of those reads
+    cmds:
+      - |
+        zcat truncated_w_errors_reads_node1_sim1.fastq.gz \
+             truncated_w_errors_reads_node2_sim2.fastq.gz \
+             truncated_w_errors_reads_node3_sim3.fastq.gz \
+             truncated_w_errors_reads_node4_sim4.fastq.gz \
+             truncated_w_errors_reads_node5_sim5.fastq.gz | gzip > truncated_w_errors_reads_all.fastq.gz
+    sources:
+      - truncated_w_errors_reads_node1_sim1.fastq.gz
+      - truncated_w_errors_reads_node2_sim2.fastq.gz
+      - truncated_w_errors_reads_node3_sim3.fastq.gz
+      - truncated_w_errors_reads_node4_sim4.fastq.gz
+      - truncated_w_errors_reads_node5_sim5.fastq.gz
+    generates:
+      - truncated_w_errors_reads_all.fastq.gz
+
+  subsample-fastq:
+    summary: |
+      Randomly select 14M reads from a FASTQ file
+    cmds:
+      - seqtk sample -s100 truncated_w_errors_reads_all.fastq.gz 14000000 | gzip > truncated_w_errors_reads_14M.fastq.gz
+    generates:
+      - truncated_w_errors_reads_14M.fastq.gz
+
+
+
+# Reverse complement the reads aligned to the reverse strand
+  reverse-complement:
+    summary: |
+      Reverse complement reads with -strand in the header
+    cmds:
+      - python reverse_complement.py -i truncated_w_errors_reads_14M.fastq.gz -o truncated_w_errors_reads_14M_rev_comp.fastq.gz
+    sources:
+      - truncated_w_errors_reads_14M.fastq.gz
+      - reverse_complement.py
+    generates:
+      - truncated_w_errors_reads_14M_rev_comp.fastq.gz

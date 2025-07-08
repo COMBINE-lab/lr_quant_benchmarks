@@ -1,0 +1,85 @@
+version: '3'
+
+tasks:
+
+  get_read_data:
+    summary: |
+      Obtain the NA12878 cDNA read data
+    cmds:
+      - aria2c -x8 https://s3.amazonaws.com/nanopore-human-wgs/rna/fastq/NA12878-cDNA_All_Guppy_4.2.2.fastq.gz
+
+  get_ref_txps:
+    summary: |
+      Obtain the reference transcript sequences for RefSeq 110 (GRCh38)
+    cmds:
+      - aria2c -x8 https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/110/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_rna.fna.gz
+
+  get_ref_genome:
+    summary: |
+      Obtain the reference genome sequences for RefSeq 110 (GRCh38)
+    cmds:
+      - aria2c -x8 https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/110/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz
+
+  align_quant_cdna_txps:
+    cmds:
+      - echo "Running minimap2 on cdna dataset"
+      - minimap2 -ax map-ont --eqx -N 181 -t 36 GCF_000001405.40_GRCh38.p14_rna.fna NA12878-cDNA_All_Guppy_4.2.2.fastq.gz | samtools view -o NA12878-cDNA_All_Guppy_4.2.2.T.bam -@ 8
+      - echo "Running salmon on cdna for quantification"
+      - mkdir -p NA12878-cDNA_quantification
+      - ../salmon/build/src/salmon quant --ont --useEM -p 30 -t GCF_000001405.40_GRCh38.p14_rna.fna -l U -a NA12878-cDNA_All_Guppy_4.2.2.T.bam -o NA12878-cDNA_quantification
+    sources:
+      - GCF_000001405.40_GRCh38.p14_rna.fna
+      - NA12878-cDNA_All_Guppy_4.2.2.fastq
+    generates:
+      - NA12878-cDNA_All_Guppy_4.2.2.T.bam
+
+  get_ref_quants:
+    summary: |
+      Obtain the reference quantifications assocaited with the TranSigner paper
+    cmds:
+      - awk 'BEGIN {print "target_id\test_counts\ttpm"} NR>1 {print $1 "\t" $5 "\t" $4}' NA12878-cDNA_quantification/quant.sf > cDNA_quantification.tsv
+    generates:
+      - cDNA_quantification.tsv
+
+
+  generate_pc_lnc_ref:
+    summary: |
+      Filter for just the protein coding and long non-coding RNA transcripts
+    cmds:
+      - rg "(^>NM_)|(long non-coding RNA)" GCF_000001405.40_GRCh38.p14_rna.fna | cut -d' ' -f1 | awk '{print(substr($1,2))}' > target_transcript_names_tmp.txt
+      - defer: rm target_transcript_names_tmp.txt
+      - rg -F -f target_transcript_names_tmp.txt cDNA_quantification.tsv | cut -f 1 | rg -v "\.\d+_\d+" > target_transcript_names.txt
+      - python3 get_target_seqs.py target_transcript_names.txt GCF_000001405.40_GRCh38.p14_rna.fna > GCF_000001405.40_GRCh38.p14_pc_lncrna.fna
+
+  filter_quantification_file:
+    summary: |
+      Filter for just the protein coding and long non-coding RNA transcripts
+    cmds:
+      - head -n 1 cDNA_quantification.tsv > cDNA_quantification_pc_lncrna.tsv
+      - grep -F -f target_transcript_names.txt cDNA_quantification.tsv >> cDNA_quantification_pc_lncrna.tsv
+    generates:
+      - cDNA_quantification_pc_lncrna.tsv
+
+  learn_sim_params:
+    cmds:
+      - mkdir -p nanosim_model
+      - ../NanoSim-3.2.3/src/read_analysis.py transcriptome -i NA12878-cDNA_All_Guppy_4.2.2.fastq.gz -rg GCF_000001405.40_GRCh38.p14_genomic.fna -rt GCF_000001405.40_GRCh38.p14_pc_lncrna.fna -t 128 --no_intron_retention --fastq -o nanosim_model/training
+    generates:
+      - nanosim_model/*
+
+  sim_reads:
+    cmds:
+      - mkdir -p nanosim_reads
+      - ../NanoSim-3.2.3/src/simulator.py transcriptome --model_prefix nanosim_model/training --ref_t GCF_000001405.40_GRCh38.p14_pc_lncrna.fna --ref_g GCF_000001405.40_GRCh38.p14_genomic.fna -e cDNA_quantification_pc_lncrna.tsv -o nanosim_reads/cdna_s1_reads -n 14000000 -s 314 --no_model_ir --fastq -t 128 -s 0.995 -b guppy
+
+  merge-fastq:
+    summary: |
+      Concatenate aligned and unaligned FASTQ files and compress the result
+    cmds:
+      - cat cdna_s1_reads_aligned_reads.fastq cdna_s1_reads_unaligned_reads.fastq | gzip > cdna_s1_reads.fastq.gz
+    sources:
+      - cdna_s1_reads_aligned_reads.fastq
+      - cdna_s1_reads_unaligned_reads.fastq
+    generates:
+      - cdna_s1_reads.fastq.gz
+
