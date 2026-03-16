@@ -1,0 +1,16 @@
+name: lr_quant_benchmark
+channels:
+- conda-forge
+- bioconda
+- nodefaults
+dependencies:
+- kallisto
+- oarfish
+- python
+- snakemake
+- bustools
+- colorlog
+- pysam
+- tqdm
+- pip:
+  - git+https://github.com/a-slide/NanoCount.git
